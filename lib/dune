@@ -1,3 +1,4 @@
 (library
  (name actaa)
+ (public_name actaa)
  (libraries eio eio.core eio.unix hmap logs unix))
