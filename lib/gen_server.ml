@@ -1,5 +1,7 @@
 type ('a, 'state) call_result =
-  [ `Reply of 'a * 'state | `Stop of Process.Stop_reason.t * 'a * 'state ]
+  [ `Reply of 'a * 'state
+  | `NoReply of 'state
+  | `Stop of Process.Stop_reason.t * 'a * 'state ]
 
 type 'state cast_result =
   [ `NoReply of 'state | `Stop of Process.Stop_reason.t * 'state ]
@@ -12,6 +14,11 @@ type ('call_msg, 'call_reply, 'cast_msg) basic_msg =
   | `Call of 'call_msg * 'call_reply Eio.Stream.t
   | `Stop of Process.Stop_reason.t * unit Eio.Stream.t ]
 
+type 'call_reply from_ty = 'call_reply Eio.Stream.t
+
+let reply (from : 'call_reply from_ty) (msg : 'call_reply) =
+  Eio.Stream.add from msg
+
 class virtual ['init_arg, 'msg, 'state] behaviour =
   object (self)
     inherit ['init_arg, 'msg] Process.t
@@ -20,7 +27,8 @@ class virtual ['init_arg, 'msg, 'state] behaviour =
         : Eio_unix.Stdenv.base -> sw:Eio.Switch.t -> 'init_arg -> 'state
 
     method private handle_call (_ : Eio_unix.Stdenv.base) ~sw:(_ : Eio.Switch.t)
-        (_ : 'state) (_ : 'call_msg) : ('call_reply, 'state) call_result =
+        (_ : 'call_reply from_ty) (_ : 'state) (_ : 'call_msg)
+        : ('call_reply, 'state) call_result =
       failwith "not implemented"
 
     method private handle_cast (_ : Eio_unix.Stdenv.base) ~sw:(_ : Eio.Switch.t)
@@ -40,13 +48,14 @@ class virtual ['init_arg, 'msg, 'state] behaviour =
       let state = self#init env ~sw args in
       let rec loop state =
         match self#receive with
-        | `Call (msg, reply_stream) -> (
-            match self#handle_call env ~sw state msg with
-            | `Reply (reply, state) ->
-                Eio.Stream.add reply_stream reply;
+        | `Call (msg, from) -> (
+            match self#handle_call env ~sw from state msg with
+            | `Reply (reply_msg, state) ->
+                reply from reply_msg;
                 loop state
-            | `Stop (reason, reply, state) ->
-                Eio.Stream.add reply_stream reply;
+            | `NoReply state -> loop state
+            | `Stop (reason, reply_msg, state) ->
+                reply from reply_msg;
                 (reason, state))
         | `Cast msg -> (
             match self#handle_cast env ~sw state msg with

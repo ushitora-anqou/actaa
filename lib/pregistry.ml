@@ -32,7 +32,7 @@ class t =
     method! private handle_cast _env ~sw:_ state =
       function `Stop -> `Stop (Process.Stop_reason.Normal, state)
 
-    method! private handle_call _env ~sw:_ state =
+    method! private handle_call _env ~sw:_ _from state =
       function
       | `Register (P (k, v)) -> (
           let do_register () =

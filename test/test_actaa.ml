@@ -151,7 +151,7 @@ module Gen_server_case1 = struct
       inherit [init_arg, msg, state] Gen_server.behaviour
       method private init _env ~sw:_ () = 0
 
-      method! private handle_call _env ~sw:_ x =
+      method! private handle_call _env ~sw:_ _from x =
         function `Set y -> `Reply (`Set x, y) | `Get -> `Reply (`Get x, x)
 
       method! private handle_cast _env ~sw:_ _ = function `Set x -> `NoReply x
